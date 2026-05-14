@@ -1,0 +1,55 @@
+{
+    "template": "t05",
+    "invoice_number": "INV-0013",
+    "invoice_title": "Tax Invoice",
+    "invoice_date": "13\/05\/2026",
+    "bill_to": "sujin",
+    "vehicle_number": "TN45 y 5454",
+    "company_name": "ramesh",
+    "company_logo": "",
+    "company_address": "",
+    "gst_number": "24ertrt4355345",
+    "company_phone": "5456456556",
+    "company_email": "55gfdfgg@76tr",
+    "bank_account": "657567667665757",
+    "bank_ifsc": "SERT0434355",
+    "bank_branch": "kalakad",
+    "proprietor": "Proprietor",
+    "items": [
+        {
+            "serial": 1,
+            "description": "sand",
+            "hsn": "",
+            "quantity": 4,
+            "per_unit": "",
+            "rate": 8000,
+            "base": 32000,
+            "cgst": 960,
+            "sgst": 960,
+            "amount": 33920
+        },
+        {
+            "serial": 2,
+            "description": "wood",
+            "hsn": "",
+            "quantity": 50,
+            "per_unit": "",
+            "rate": 40,
+            "base": 2000,
+            "cgst": 60,
+            "sgst": 60,
+            "amount": 2120
+        }
+    ],
+    "totals": {
+        "subtotal": 34000,
+        "cgst_total": 1020,
+        "sgst_total": 1020,
+        "total": 36040
+    },
+    "payment_made": 0,
+    "balance_due": 36040,
+    "amount_words": "Thirty Six Thousand Forty Only",
+    "notes": "Note: Tax charged at 6% as per Notification No. 02\/2022-Central Tax (Rate) without availment of Input Tax Credit",
+    "created_at": "2026-05-13 06:26:53"
+}

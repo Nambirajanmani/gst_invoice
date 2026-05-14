@@ -1,0 +1,43 @@
+{
+    "template": "t01",
+    "invoice_number": "INV-0003",
+    "invoice_title": "Tax Invoice",
+    "invoice_date": "12\/05\/2026",
+    "bill_to": "ram",
+    "vehicle_number": "tn43 y6545",
+    "company_name": "rohan",
+    "company_logo": "",
+    "company_address": "",
+    "gst_number": "24ertrt4355345",
+    "company_phone": "645645654645645645645",
+    "company_email": "55gfdfgg@76tr",
+    "bank_account": "2342342343445345",
+    "bank_ifsc": "5dsfs332424523",
+    "bank_branch": "kalakad",
+    "proprietor": "Proprietor",
+    "items": [
+        {
+            "serial": 1,
+            "description": "briks",
+            "hsn": "234",
+            "quantity": 5,
+            "per_unit": "2",
+            "rate": 100,
+            "base": 500,
+            "cgst": 15,
+            "sgst": 15,
+            "amount": 530
+        }
+    ],
+    "totals": {
+        "subtotal": 500,
+        "cgst_total": 15,
+        "sgst_total": 15,
+        "total": 530
+    },
+    "payment_made": 0,
+    "balance_due": 530,
+    "amount_words": "Five Hundred Thirty Only",
+    "notes": "Note: Tax charged at 6% as per Notification No. 02\/2022-Central Tax (Rate) without availment of Input Tax Credit",
+    "created_at": "2026-05-12 04:58:30"
+}

@@ -1,0 +1,43 @@
+{
+    "template": "t01",
+    "invoice_number": "INV-0005",
+    "invoice_title": "Tax Invoice",
+    "invoice_date": "12\/05\/2026",
+    "bill_to": "ramesh",
+    "vehicle_number": "tn72r4567",
+    "company_name": "ram",
+    "company_logo": "",
+    "company_address": "",
+    "gst_number": "",
+    "company_phone": "6456456546",
+    "company_email": "",
+    "bank_account": "",
+    "bank_ifsc": "",
+    "bank_branch": "",
+    "proprietor": "Proprietor",
+    "items": [
+        {
+            "serial": 1,
+            "description": "briks",
+            "hsn": "",
+            "quantity": 100000,
+            "per_unit": "",
+            "rate": 5,
+            "base": 500000,
+            "cgst": 15000,
+            "sgst": 15000,
+            "amount": 530000
+        }
+    ],
+    "totals": {
+        "subtotal": 500000,
+        "cgst_total": 15000,
+        "sgst_total": 15000,
+        "total": 530000
+    },
+    "payment_made": 0,
+    "balance_due": 530000,
+    "amount_words": "Five Lakh Thirty Thousand Only",
+    "notes": "Note: Tax charged at 6% as per Notification No. 02\/2022-Central Tax (Rate) without availment of Input Tax Credit",
+    "created_at": "2026-05-12 05:07:10"
+}
