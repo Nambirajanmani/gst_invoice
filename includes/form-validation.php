@@ -5,12 +5,18 @@
  */
 function validate_invoice_form(array $post): array {
     $errors = [];
+    $gstPattern = '/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/';
 
     $company = trim((string)($post['company_name'] ?? ''));
     if ($company === '') {
         $errors['company_name'] = 'Company name is required.';
     } elseif (!preg_match('/^[A-Za-z]+(?:\s+[A-Za-z]+)*$/u', $company)) {
         $errors['company_name'] = 'Use letters and spaces only. No numbers or special characters.';
+    }
+
+    $gst = strtoupper(trim((string)($post['gst_number'] ?? '')));
+    if ($gst !== '' && !preg_match($gstPattern, $gst)) {
+        $errors['gst_number'] = 'Enter a valid 15-character GSTIN (e.g. 33APAPR0776B3Z7).';
     }
 
     $phone = trim((string)($post['company_phone'] ?? ''));

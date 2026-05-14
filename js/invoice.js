@@ -3,6 +3,7 @@
 const CGST_RATE = 3;
 const SGST_RATE = 3;
 const TEXT_ONLY_WORDS = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
+const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
 let rowIdx = typeof window.__INITIAL_ITEM_ROW_COUNT__ === 'number' ? window.__INITIAL_ITEM_ROW_COUNT__ : 1;
 
@@ -239,6 +240,13 @@ function validatePhone(v) {
   return '';
 }
 
+function validateGSTNumber(v) {
+  v = trimStr(v).toUpperCase();
+  if (v === '') return '';
+  if (!GSTIN_PATTERN.test(v)) return 'Enter a valid 15-character GSTIN (e.g. 33APAPR0776B3Z7).';
+  return '';
+}
+
 function validateAccount(v) {
   v = trimStr(v);
   if (v === '') return '';
@@ -336,6 +344,11 @@ function validateStaticFields() {
   setInputError(cn, e1);
   if (e1) ok = false;
 
+  const gst = document.getElementById('fld_gst_number');
+  const eg = validateGSTNumber(gst?.value);
+  setInputError(gst, eg);
+  if (eg) ok = false;
+
   const ph = document.getElementById('fld_company_phone');
   const e2 = validatePhone(ph?.value);
   setInputError(ph, e2);
@@ -422,11 +435,22 @@ function bindStaticFieldLiveValidation() {
   };
 
   bind('fld_company_name', validateCompanyName);
+  bind('fld_gst_number', validateGSTNumber);
   bind('fld_company_phone', validatePhone);
   bind('fld_bank_account', validateAccount);
   bind('fld_bank_ifsc', validateIFSC);
   bind('fld_bank_branch', validateBranch);
   bind('fld_bill_to', validateBillTo);
+
+  const gst = document.getElementById('fld_gst_number');
+  gst?.addEventListener('input', () => {
+    const clean = gst.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 15).toUpperCase();
+    if (gst.value !== clean) gst.value = clean;
+  });
+  gst?.addEventListener('blur', () => {
+    gst.value = trimStr(gst.value).toUpperCase();
+    setInputError(gst, validateGSTNumber(gst.value));
+  });
 
   const ph = document.getElementById('fld_company_phone');
   ph?.addEventListener('input', () => {
@@ -474,6 +498,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const ifsc = document.getElementById('fld_bank_ifsc');
     if (ifsc) ifsc.value = trimStr(ifsc.value).toUpperCase();
+    const gst = document.getElementById('fld_gst_number');
+    if (gst) gst.value = trimStr(gst.value).toUpperCase();
 
     if (!runFullValidation()) {
       e.preventDefault();

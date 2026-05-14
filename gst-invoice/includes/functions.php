@@ -143,8 +143,103 @@ function formatInvoiceDateFromDb($value): string {
     return $timestamp ? date('d/m/Y', $timestamp) : $value;
 }
 
+function getVisibleCompanyCondition(string $alias = 'companies'): string {
+    $alias = trim($alias);
+    $prefix = $alias !== '' ? $alias . '.' : '';
+
+    // Treat legacy rows with NULL visibility as visible.
+    return 'COALESCE(' . $prefix . 'is_active, TRUE) = TRUE';
+}
+
+function normalizeCompanyText(string $value): string {
+    $value = preg_replace('/\s+/u', ' ', trim($value));
+    return $value === null ? '' : $value;
+}
+
+function normalizeCompanyLookupText(string $value): string {
+    return strtolower(normalizeCompanyText($value));
+}
+
+function normalizeCompanyDigits(string $value): string {
+    return preg_replace('/\D+/', '', $value) ?? '';
+}
+
+function normalizeCompanyEmail(string $value): string {
+    return strtolower(trim($value));
+}
+
+function hasCompanyIdentityData(array $data): bool {
+    return normalizeCompanyText((string) ($data['company_name'] ?? '')) !== ''
+        || trim((string) ($data['gst_number'] ?? '')) !== ''
+        || normalizeCompanyDigits((string) ($data['company_phone'] ?? '')) !== ''
+        || normalizeCompanyEmail((string) ($data['company_email'] ?? '')) !== '';
+}
+
+function findMatchingCompanyId(PDO $pdo, array $data): ?int {
+    $gst = strtoupper(trim((string) ($data['gst_number'] ?? '')));
+    if ($gst !== '') {
+        $stmt = $pdo->prepare(
+            'SELECT id
+             FROM companies
+             WHERE ' . getVisibleCompanyCondition('companies') . '
+               AND UPPER(BTRIM(COALESCE(gst_number, \'\'))) = :gst
+             ORDER BY id ASC
+             LIMIT 1'
+        );
+        $stmt->execute([':gst' => $gst]);
+        $companyId = $stmt->fetchColumn();
+        if ($companyId !== false) {
+            return (int) $companyId;
+        }
+    }
+
+    $companyName = normalizeCompanyLookupText((string) ($data['company_name'] ?? ''));
+    if ($companyName === '') {
+        return null;
+    }
+
+    $phone = normalizeCompanyDigits((string) ($data['company_phone'] ?? ''));
+    $email = normalizeCompanyEmail((string) ($data['company_email'] ?? ''));
+
+    $stmt = $pdo->prepare(
+        'SELECT id
+         FROM companies
+         WHERE ' . getVisibleCompanyCondition('companies') . '
+           AND LOWER(REGEXP_REPLACE(BTRIM(COALESCE(company_name, \'\')), \'\s+\', \' \', \'g\')) = :company_name
+         ORDER BY
+           CASE
+             WHEN :phone = \'\' THEN 0
+             WHEN REGEXP_REPLACE(COALESCE(phone, \'\'), \'\\D+\', \'\', \'g\') = :phone THEN 0
+             WHEN BTRIM(COALESCE(phone, \'\')) = \'\' THEN 1
+             ELSE 2
+           END,
+           CASE
+             WHEN :email = \'\' THEN 0
+             WHEN LOWER(BTRIM(COALESCE(email, \'\'))) = :email THEN 0
+             WHEN BTRIM(COALESCE(email, \'\')) = \'\' THEN 1
+             ELSE 2
+           END,
+           id ASC
+         LIMIT 1'
+    );
+    $stmt->execute([
+        ':company_name' => $companyName,
+        ':phone' => $phone,
+        ':email' => $email,
+    ]);
+
+    $companyId = $stmt->fetchColumn();
+    return $companyId === false ? null : (int) $companyId;
+}
+
 function getActiveCompanyId(PDO $pdo): int {
-    $stmt = $pdo->query("SELECT id FROM companies WHERE is_active = TRUE ORDER BY id ASC LIMIT 1");
+    $stmt = $pdo->query(
+        "SELECT id
+         FROM companies
+         WHERE " . getVisibleCompanyCondition('companies') . "
+         ORDER BY CASE WHEN is_active IS TRUE THEN 0 ELSE 1 END, id ASC
+         LIMIT 1"
+    );
     $companyId = $stmt->fetchColumn();
 
     if ($companyId !== false) {
@@ -161,6 +256,77 @@ function getActiveCompanyId(PDO $pdo): int {
     );
 
     return (int) $pdo->lastInsertId('companies_id_seq');
+}
+
+function saveCompanyRecord(PDO $pdo, array $data, string $logoPath = ''): int {
+    $companyId = findMatchingCompanyId($pdo, $data);
+
+    if ($companyId === null) {
+        if (!hasCompanyIdentityData($data)) {
+            return getActiveCompanyId($pdo);
+        }
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO companies (
+                company_name, company_address, gst_number, phone, email, logo_path,
+                bank_account, bank_ifsc, bank_branch, proprietor, is_active
+            ) VALUES (
+                :company_name, :company_address, :gst_number, :phone, :email, :logo_path,
+                :bank_account, :bank_ifsc, :bank_branch, :proprietor, TRUE
+            )'
+        );
+        $stmt->execute([
+            ':company_name' => normalizeCompanyText((string) ($data['company_name'] ?? '')),
+            ':company_address' => trim((string) ($data['company_address'] ?? '')),
+            ':gst_number' => strtoupper(trim((string) ($data['gst_number'] ?? ''))),
+            ':phone' => trim((string) ($data['company_phone'] ?? '')),
+            ':email' => trim((string) ($data['company_email'] ?? '')),
+            ':logo_path' => $logoPath,
+            ':bank_account' => trim((string) ($data['bank_account'] ?? '')),
+            ':bank_ifsc' => strtoupper(trim((string) ($data['bank_ifsc'] ?? ''))),
+            ':bank_branch' => trim((string) ($data['bank_branch'] ?? '')),
+            ':proprietor' => trim((string) ($data['proprietor'] ?? 'Proprietor')),
+        ]);
+
+        return (int) $pdo->lastInsertId('companies_id_seq');
+    }
+
+    if ($logoPath === '') {
+        $logoStmt = $pdo->prepare('SELECT logo_path FROM companies WHERE id = :id');
+        $logoStmt->execute([':id' => $companyId]);
+        $logoPath = (string) ($logoStmt->fetchColumn() ?: '');
+    }
+
+    $stmt = $pdo->prepare(
+        'UPDATE companies SET
+            company_name = :company_name,
+            company_address = :company_address,
+            gst_number = :gst_number,
+            phone = :phone,
+            email = :email,
+            logo_path = :logo_path,
+            bank_account = :bank_account,
+            bank_ifsc = :bank_ifsc,
+            bank_branch = :bank_branch,
+            proprietor = :proprietor,
+            is_active = TRUE
+         WHERE id = :id'
+    );
+    $stmt->execute([
+        ':company_name' => normalizeCompanyText((string) ($data['company_name'] ?? '')),
+        ':company_address' => trim((string) ($data['company_address'] ?? '')),
+        ':gst_number' => strtoupper(trim((string) ($data['gst_number'] ?? ''))),
+        ':phone' => trim((string) ($data['company_phone'] ?? '')),
+        ':email' => trim((string) ($data['company_email'] ?? '')),
+        ':logo_path' => $logoPath,
+        ':bank_account' => trim((string) ($data['bank_account'] ?? '')),
+        ':bank_ifsc' => strtoupper(trim((string) ($data['bank_ifsc'] ?? ''))),
+        ':bank_branch' => trim((string) ($data['bank_branch'] ?? '')),
+        ':proprietor' => trim((string) ($data['proprietor'] ?? 'Proprietor')),
+        ':id' => $companyId,
+    ]);
+
+    return $companyId;
 }
 
 function generateInvoiceNumber() {
@@ -200,46 +366,12 @@ function getUploadsDir() { return dirname(__DIR__) . '/uploads/'; }
 
 function saveInvoice($data) {
     $pdo = getDbConnection();
-    $companyId = getActiveCompanyId($pdo);
 
     try {
         $pdo->beginTransaction();
 
         $logoPath = trim((string) ($data['company_logo'] ?? ''));
-        if ($logoPath === '') {
-            $logoStmt = $pdo->prepare('SELECT logo_path FROM companies WHERE id = :id');
-            $logoStmt->execute([':id' => $companyId]);
-            $logoPath = (string) ($logoStmt->fetchColumn() ?: '');
-        }
-
-        $companyStmt = $pdo->prepare(
-            'UPDATE companies SET
-                company_name = :company_name,
-                company_address = :company_address,
-                gst_number = :gst_number,
-                phone = :phone,
-                email = :email,
-                logo_path = :logo_path,
-                bank_account = :bank_account,
-                bank_ifsc = :bank_ifsc,
-                bank_branch = :bank_branch,
-                proprietor = :proprietor,
-                is_active = TRUE
-             WHERE id = :id'
-        );
-        $companyStmt->execute([
-            ':company_name' => (string) ($data['company_name'] ?? ''),
-            ':company_address' => (string) ($data['company_address'] ?? ''),
-            ':gst_number' => (string) ($data['gst_number'] ?? ''),
-            ':phone' => (string) ($data['company_phone'] ?? ''),
-            ':email' => (string) ($data['company_email'] ?? ''),
-            ':logo_path' => $logoPath,
-            ':bank_account' => (string) ($data['bank_account'] ?? ''),
-            ':bank_ifsc' => (string) ($data['bank_ifsc'] ?? ''),
-            ':bank_branch' => (string) ($data['bank_branch'] ?? ''),
-            ':proprietor' => (string) ($data['proprietor'] ?? 'Proprietor'),
-            ':id' => $companyId,
-        ]);
+        $companyId = saveCompanyRecord($pdo, $data, $logoPath);
 
         $invoiceStmt = $pdo->prepare(
             'INSERT INTO invoices (
@@ -312,6 +444,89 @@ function saveInvoice($data) {
     }
 }
 
+function buildCompanyFilters(array $options, array &$params): array {
+    $where = [getVisibleCompanyCondition('companies')];
+
+    $search = trim((string) ($options['search'] ?? ''));
+    if ($search !== '') {
+        $params[':search'] = '%' . $search . '%';
+        $where[] = '(companies.company_name ILIKE :search
+            OR companies.gst_number ILIKE :search
+            OR companies.phone ILIKE :search
+            OR companies.email ILIKE :search)';
+    }
+
+    return $where;
+}
+
+function getCompanies(array $options = []): array {
+    $pdo = getDbConnection();
+    $params = [];
+    $where = buildCompanyFilters($options, $params);
+    $page = max(1, (int) ($options['page'] ?? 1));
+    $perPage = max(1, min(500, (int) ($options['per_page'] ?? 25)));
+    $offset = ($page - 1) * $perPage;
+
+    $sortMap = [
+        'id' => 'companies.id',
+        'company_name' => 'companies.company_name',
+        'gst_number' => 'companies.gst_number',
+        'created_at' => 'companies.created_at',
+        'updated_at' => 'companies.updated_at',
+    ];
+    $sortBy = (string) ($options['sort_by'] ?? 'id');
+    $sortDir = strtolower((string) ($options['sort_dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
+    $orderBy = $sortMap[$sortBy] ?? $sortMap['id'];
+
+    $sql = 'SELECT
+                companies.id,
+                companies.company_name,
+                companies.company_address,
+                companies.gst_number,
+                companies.phone,
+                companies.email,
+                companies.logo_path,
+                companies.bank_account,
+                companies.bank_ifsc,
+                companies.bank_branch,
+                companies.proprietor,
+                companies.is_active,
+                companies.created_at,
+                companies.updated_at
+            FROM companies
+            WHERE ' . implode(' AND ', $where) . '
+            ORDER BY ' . $orderBy . ' ' . $sortDir . '
+            LIMIT :limit OFFSET :offset';
+
+    $stmt = $pdo->prepare($sql);
+    foreach ($params as $key => $value) {
+        $stmt->bindValue($key, $value, PDO::PARAM_STR);
+    }
+    $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    return $stmt->fetchAll();
+}
+
+function countCompanies(array $options = []): int {
+    $pdo = getDbConnection();
+    $params = [];
+    $where = buildCompanyFilters($options, $params);
+
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*)
+         FROM companies
+         WHERE ' . implode(' AND ', $where)
+    );
+    foreach ($params as $key => $value) {
+        $stmt->bindValue($key, $value, PDO::PARAM_STR);
+    }
+    $stmt->execute();
+
+    return (int) $stmt->fetchColumn();
+}
+
 function loadInvoice($invoiceNumber) {
     $pdo = getDbConnection();
 
@@ -344,7 +559,7 @@ function loadInvoice($invoiceNumber) {
             c.bank_branch,
             c.proprietor
          FROM invoices i
-         INNER JOIN companies c ON c.id = i.company_id
+         LEFT JOIN companies c ON c.id = i.company_id
          WHERE i.invoice_number = :invoice_number
          LIMIT 1'
     );
@@ -444,7 +659,7 @@ function getRecentInvoices($limit = 8) {
             c.bank_branch,
             c.proprietor
          FROM invoices i
-         INNER JOIN companies c ON c.id = i.company_id
+         LEFT JOIN companies c ON c.id = i.company_id
          ORDER BY i.created_at DESC, i.id DESC
          LIMIT :limit'
     );

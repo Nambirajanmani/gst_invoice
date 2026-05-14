@@ -257,8 +257,9 @@ $selectedTemplate = $prefill['template'] ?? 't01';
     </div>
     <div class="form-row-3">
       <div class="form-group">
-        <label>GST Number</label>
-        <input type="text" name="gst_number" value="<?= sanitize($prefill['gst_number'] ?? '') ?>" placeholder="e.g. 33APAPR0776B3Z7" style="text-transform:uppercase">
+        <label for="fld_gst_number">GST Number</label>
+        <input type="text" name="gst_number" id="fld_gst_number" maxlength="15" value="<?= sanitize($prefill['gst_number'] ?? '') ?>" placeholder="e.g. 33APAPR0776B3Z7" style="text-transform:uppercase" autocomplete="off">
+        <span class="field-error-msg" id="err_gst_number" role="alert"><?= !empty($invoiceFormErrors['gst_number']) ? sanitize($invoiceFormErrors['gst_number']) : '' ?></span>
       </div>
       <div class="form-group">
         <label for="fld_company_phone">Phone</label>
