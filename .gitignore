@@ -1,0 +1,11 @@
+# Environment variables - NEVER commit this file
+.env
+
+# Uploaded files
+uploads/
+invoices/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/

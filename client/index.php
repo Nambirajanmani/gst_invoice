@@ -1,6 +1,12 @@
 <?php
 require_once dirname(__DIR__) . '/server/includes/functions.php';
-$recent = getRecentInvoices(8);
+$currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$perPage = 10;
+$paginatedData = getPaginatedInvoices($currentPage, $perPage);
+$invoices = $paginatedData['invoices'];
+$totalInvoices = $paginatedData['total'];
+$totalPages = $paginatedData['total_pages'];
+
 $allInv = getRecentInvoices(1000);
 $revenue = 0;
 foreach ($allInv as $a) $revenue += (float)($a['totals']['total'] ?? 0);
@@ -34,7 +40,7 @@ foreach ($allInv as $a) $revenue += (float)($a['totals']['total'] ?? 0);
 
   <div class="stats-grid">
     <div class="stat-card">
-      <div class="stat-val"><?= count($allInv) ?></div>
+      <div class="stat-val"><?= $totalInvoices ?></div>
       <div class="stat-lbl">Total Invoices</div>
     </div>
     <div class="stat-card" style="border-top-color:#1b5e20">
@@ -53,10 +59,10 @@ foreach ($allInv as $a) $revenue += (float)($a['totals']['total'] ?? 0);
 
   <div class="card">
     <div class="card-header">
-      <h2>📋 Recent Invoices</h2>
+      <h2>📋 All Invoices</h2>
       <a href="create-invoice.php" class="btn btn-primary">+ New Invoice</a>
     </div>
-    <?php if (empty($recent)): ?>
+    <?php if (empty($invoices)): ?>
     <div class="empty-state">
       <div class="icon">📄</div>
       <p style="margin-bottom:1rem">No invoices yet!</p>
@@ -64,7 +70,7 @@ foreach ($allInv as $a) $revenue += (float)($a['totals']['total'] ?? 0);
     </div>
     <?php else: ?>
     <ul class="inv-list">
-      <?php foreach ($recent as $inv): ?>
+      <?php foreach ($invoices as $inv): ?>
       <li class="inv-item">
         <div>
           <div class="inv-num"><?= sanitize($inv['invoice_number'] ?? '') ?></div>
@@ -85,6 +91,25 @@ foreach ($allInv as $a) $revenue += (float)($a['totals']['total'] ?? 0);
       </li>
       <?php endforeach; ?>
     </ul>
+
+    <!-- PAGINATION CONTROLS -->
+    <?php if ($totalPages > 1): ?>
+    <div class="pagination-wrap">
+      <div class="pagination-info">
+        Showing <?= (($currentPage - 1) * $perPage) + 1 ?>–<?= min($currentPage * $perPage, $totalInvoices) ?> of <?= $totalInvoices ?> invoices (Page <?= $currentPage ?> of <?= $totalPages ?>)
+      </div>
+      <div class="pagination-nav">
+        <a href="?page=<?= $currentPage - 1 ?>" class="page-link <?= $currentPage <= 1 ? 'disabled' : '' ?>">← Prev</a>
+        
+        <?php for ($p = 1; $p <= $totalPages; $p++): ?>
+          <a href="?page=<?= $p ?>" class="page-link <?= $p === $currentPage ? 'active' : '' ?>"><?= $p ?></a>
+        <?php endfor; ?>
+
+        <a href="?page=<?= $currentPage + 1 ?>" class="page-link <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">Next →</a>
+      </div>
+    </div>
+    <?php endif; ?>
+
     <?php endif; ?>
   </div>
 </div>

@@ -666,3 +666,93 @@ function deleteInvoice($invoiceNumber) {
     }
 }
 
+function getPaginatedInvoices($page = 1, $perPage = 10) {
+    $pdo = getDbConnection();
+    $page = max(1, (int)$page);
+    $perPage = max(1, (int)$perPage);
+    $offset = ($page - 1) * $perPage;
+
+    $totalStmt = $pdo->query('SELECT COUNT(*) FROM invoices');
+    $totalCount = (int)$totalStmt->fetchColumn();
+    $totalPages = max(1, (int)ceil($totalCount / $perPage));
+
+    $stmt = $pdo->prepare(
+        'SELECT
+            i.invoice_number,
+            i.invoice_title,
+            i.template,
+            i.invoice_date,
+            i.bill_to,
+            i.vehicle_number,
+            i.subtotal,
+            i.cgst_total,
+            i.sgst_total,
+            i.total,
+            i.payment_made,
+            i.balance_due,
+            i.amount_words,
+            i.notes,
+            i.created_at,
+            c.company_name,
+            c.company_address,
+            c.gst_number,
+            c.phone AS company_phone,
+            c.email AS company_email,
+            c.logo_path AS company_logo,
+            c.bank_account,
+            c.bank_ifsc,
+            c.bank_branch,
+            c.proprietor
+         FROM invoices i
+         LEFT JOIN companies c ON c.id = i.company_id
+         ORDER BY i.created_at DESC, i.id DESC
+         LIMIT :limit OFFSET :offset'
+    );
+    $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    $invoices = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $invoices[] = [
+            'template' => (string) $row['template'],
+            'invoice_number' => (string) $row['invoice_number'],
+            'invoice_title' => (string) $row['invoice_title'],
+            'invoice_date' => formatInvoiceDateFromDb($row['invoice_date']),
+            'bill_to' => (string) $row['bill_to'],
+            'vehicle_number' => (string) $row['vehicle_number'],
+            'company_name' => (string) $row['company_name'],
+            'company_logo' => (string) $row['company_logo'],
+            'company_address' => (string) $row['company_address'],
+            'gst_number' => (string) $row['gst_number'],
+            'company_phone' => (string) $row['company_phone'],
+            'company_email' => (string) $row['company_email'],
+            'bank_account' => (string) $row['bank_account'],
+            'bank_ifsc' => (string) $row['bank_ifsc'],
+            'bank_branch' => (string) $row['bank_branch'],
+            'proprietor' => (string) $row['proprietor'],
+            'items' => [],
+            'totals' => [
+                'subtotal' => (float) $row['subtotal'],
+                'cgst_total' => (float) $row['cgst_total'],
+                'sgst_total' => (float) $row['sgst_total'],
+                'total' => (float) $row['total'],
+            ],
+            'payment_made' => (float) $row['payment_made'],
+            'balance_due' => (float) $row['balance_due'],
+            'amount_words' => (string) $row['amount_words'],
+            'notes' => (string) $row['notes'],
+            'created_at' => (string) $row['created_at'],
+        ];
+    }
+
+    return [
+        'invoices' => $invoices,
+        'total' => $totalCount,
+        'page' => $page,
+        'per_page' => $perPage,
+        'total_pages' => $totalPages
+    ];
+}
+
+
